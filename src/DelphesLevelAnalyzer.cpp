@@ -49,14 +49,33 @@ void DelphesLevelAnalyzer::Loop()
   pair <TLorentzVector*, int> lepton2= make_pair(multilepton_Lepton2_P4, multilepton_Lepton2_Id);
   pair <TLorentzVector*, int> lepton3= make_pair(multilepton_Lepton3_P4, multilepton_Lepton3_Id);
   pair <TLorentzVector*, int> lepton4= make_pair(multilepton_Lepton4_P4, multilepton_Lepton4_Id);
-  pair <TLorentzVector*, int> lepton1pt, lepton2pt, lepton3pt, lepton4pt, lepton1DeltaR, lepton2DeltaR, lepton3DeltaR, lepton4DeltaR;
+  pair <TLorentzVector*, int> lepton1pt, lepton2pt, lepton3pt, lepton4pt, lepton1DeltaR, lepton2DeltaR, lepton3DeltaR, lepton4DeltaR, leptonB1DeltaR, leptonB2DeltaR;
+
+  TLorentzVector* Bjet1;
+  TLorentzVector* Bjet2;
 
   //Tree level variables
   float ptMuon, ptElectron, ptM1, ptM2;
-  float deltaRLeptonPt, deltaRLeptonMin,deltaRLeptonClosest;
-  float invMassPtZ, invMassDeltaRZ;
+  float deltaRLeptonPt, deltaRleptonoMinPt,deltaRLeptonClosest,deltaRLeptonB1,deltaRLeptonB2;
+  float invMassPtZ, invMassDeltaRZ, invMassBlep1,invMassBlep2, invMassPtW, invMassDeltaRW;
 
   bool filled;
+
+  //Tree creation
+  TFile* fOutput=new TFile("DelphesLevelAnalyzer.root","RECREATE");
+  TTree* tOutput=new TTree("Tree","Tree");
+
+  tOutput->Branch("invMassPtZ",&invMassPtZ,"invMassPtZ/F");
+  tOutput->Branch("invMassDeltaRZ",&invMassDeltaRZ,"invMassDeltaRZ/F");
+  tOutput->Branch("deltaRLeptonPt",&deltaRLeptonPt,"deltaRLeptonPt/F");
+  tOutput->Branch("deltaRLeptonClosest",&deltaRLeptonClosest,"deltaRLeptonClosest/F");
+  tOutput->Branch("deltaRleptonoMinPt",&deltaRleptonoMinPt,"deltaRleptonoMinPt/F");
+  tOutput->Branch("deltaRLeptonB1",&deltaRLeptonB1,"deltaRLeptonB1/F");
+  tOutput->Branch("deltaRLeptonB2",&deltaRLeptonB2,"deltaRLeptonB2/F");
+  tOutput->Branch("invMassBlep1",&invMassBlep1,"invMassBlep1/F");
+  tOutput->Branch("invMassBlep2",&invMassBlep2,"invMassBlep2/F");
+  tOutput->Branch("invMassPtW",&invMassPtW,"invMassPtW/F");
+  tOutput->Branch("invMassDeltaRW",&invMassDeltaRW,"invMassDeltaRW");
 
 
    if (fChain == 0) return;
@@ -82,11 +101,14 @@ void DelphesLevelAnalyzer::Loop()
       lepton3= make_pair(multilepton_Lepton3_P4, multilepton_Lepton3_Id);
       lepton4= make_pair(multilepton_Lepton4_P4, multilepton_Lepton4_Id);
 
+      Bjet1=multilepton_Bjet1_P4;
+      Bjet2=multilepton_Bjet2_P4;
+
 
 
       //Selection highest pt couple
       //Z and W are hypothesis, it's simpler to write Z than "higherptcouple"
-      ptMuon, ptElectron, ptM1, ptM2 = -1;
+      ptMuon=-1; ptElectron=-1; ptM1=-1; ptM2 = -1;
       Lepton.push_back(lepton1); Lepton.push_back(lepton2); Lepton.push_back(lepton3); Lepton.push_back(lepton4);
 
       for (int i=0; i<Lepton.size(); i++){
@@ -97,6 +119,7 @@ void DelphesLevelAnalyzer::Loop()
       //Sort with pt
       sort(Muon.begin(),Muon.end(),compare);
       sort(Electron.begin(),Electron.end(),compare);
+
 
       //Select couple part-antipart
       bool emptyMuon=true;
@@ -119,6 +142,7 @@ void DelphesLevelAnalyzer::Loop()
         }
         ptMuon=ptM1+ptM2;
       }
+
 
       if (Electron.size()>1){
 
@@ -165,10 +189,10 @@ void DelphesLevelAnalyzer::Loop()
 
 
       //Selection deltaR-closest lepton
-      deltaRLeptonClosest=10;
+      deltaRLeptonClosest=7;
       for (int i=0; i<Lepton.size(); i++){
-        for(int j=i; j<Lepton.size();j++){
-          if(deltaRLeptonClosest<Lepton[i].first->DeltaR(*Lepton[j].first)){
+        for(int j=i+1; j<Lepton.size();j++){
+          if(deltaRLeptonClosest>Lepton[i].first->DeltaR(*Lepton[j].first)){
             deltaRLeptonClosest=Lepton[i].first->DeltaR(*Lepton[j].first);
             lepton1DeltaR=Lepton[i];
             lepton2DeltaR=Lepton[j];
@@ -184,6 +208,20 @@ void DelphesLevelAnalyzer::Loop()
           filled=true;
         }
       }
+      //deltaRbtwBand closest L
+      deltaRLeptonB1=7; deltaRLeptonB2=7;
+      for(int i=0;i<Lepton.size();i++){
+        if(Lepton[i].first->DeltaR(*Bjet1)<deltaRLeptonB1){
+          deltaRLeptonB1=Lepton[i].first->DeltaR(*Bjet1);
+          leptonB1DeltaR=Lepton[i];
+        }
+      }
+      for(int i=0;i<Lepton.size();i++){
+        if(Lepton[i].first->DeltaR(*Bjet2)<deltaRLeptonB2 && Lepton[i]!=leptonB1DeltaR){
+          deltaRLeptonB2=Lepton[i].first->DeltaR(*Bjet2);
+          leptonB2DeltaR=Lepton[i];
+        }
+      }
 
 
       //####################################
@@ -192,12 +230,28 @@ void DelphesLevelAnalyzer::Loop()
 
       //DeltaR btw "Z" lepton
       deltaRLeptonPt=lepton1pt.first->DeltaR(*lepton2pt.first);
+      deltaRleptonoMinPt=lepton3pt.first->DeltaR(*lepton4pt.first);
       //invariant mass "Z"
       invMassPtZ=(*lepton1pt.first+*lepton2pt.first).M();
-      invMassPtZ=(*lepton1DeltaR.first+*lepton2DeltaR.first);
+      invMassDeltaRZ=(*lepton1DeltaR.first+*lepton2DeltaR.first).M();
+      //invariant mass "W"
+      invMassPtW=(*lepton3pt.first+*lepton4pt.first).M();
+      invMassDeltaRW=(*lepton3DeltaR.first+*lepton4DeltaR.first).M();
+      //invariant mass B and lepton
+      invMassBlep1=(*leptonB1DeltaR.first+*Bjet1).M();
+      invMassBlep2=(*leptonB2DeltaR.first+*Bjet2).M();
+
+
+
+      //Fill
+      tOutput->Fill();
 
 
 
    }
+   tOutput->Write();
+   cout<<"File created"<<endl;
+   delete tOutput;
+   delete fOutput;
 
 }
